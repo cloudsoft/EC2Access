@@ -71,18 +71,21 @@ function Get-EC2Password {
     [Parameter(Position=2)] [string]$PrivateKeyFile
   )
 
-  $ErrorActionPreference = "Stop"
-
   # Verify the private key files exists
-  if($null -eq $PrivateKeyFile) {
+  if(!($PrivateKeyFile)) {
     $PrivateKeyFile = $HOME + '\.ssh\id_rsa'
+    Write-Verbose "No private key file given - defaulting to $($PrivateKeyFile)"
   }
   if(-not (Test-Path $PrivateKeyFile)) {
     Write-Error "$($PrivateKeyFile) does not exist. Do you need to use -PrivateKeyFile argument?"
   }
 
   Write-Verbose "Requesting password data from AWS"
-  $cipherText = (Get-EC2PasswordData -Region $Region -InstanceId $InstanceId)
+  if ($Region) {
+    $cipherText = Get-EC2PasswordData -InstanceId $InstanceId -Region $Region
+  } else {
+    $cipherText = Get-EC2PasswordData -InstanceId $InstanceId
+  }
 
   Write-Verbose "Decrypting password"
   $password = Convert-RSAEncryptedCipherTextToClearText -PemFile $PrivateKeyFile -CipherText $cipherText
@@ -120,12 +123,16 @@ function Start-DirectEC2RemoteDesktop {
     [Parameter(Position=2)] [string]$PrivateKeyFile
   )
   
-  $password = Get-EC2Password -Instance $InstanceId -Region $Region -PrivateKeyFile $PrivateKeyFile
+  $password = Get-EC2Password -InstanceId $InstanceId -Region $Region -PrivateKeyFile $PrivateKeyFile
   $Credential = New-Object PSCredential "Administrator",$password
 
-  $instance = (Get-EC2Instance -Region $Region -InstanceId $InstanceId).Instances[0]
-  $HostName = $instance.PublicIpAddress
-  Write-Verbose "Instance IP address is $HostName"
+  if($Region) {
+    $response = Get-EC2Instance -InstanceId $InstanceId -Region $Region
+  } else {
+    $response = Get-EC2Instance -InstanceId $InstanceId
+  }
+  $HostName = $response.Instances[0].PublicIpAddress
+  Write-Verbose "Instance address is $HostName"
 
   if ($PSCmdlet.ShouldProcess($InstanceId,'Start remote desktop session')) {
     Start-RemoteDesktop -HostName $HostName -Credential $Credential
@@ -160,12 +167,16 @@ function Start-EC2RemoteDesktopViaSessionManager {
     [Parameter(Position=2)] [string]$PrivateKeyFile
   )
   
-  $password = Get-EC2Password -Instance $InstanceId -Region $Region -PrivateKeyFile $PrivateKeyFile
+  $password = Get-EC2Password -InstanceId $InstanceId -Region $Region -PrivateKeyFile $PrivateKeyFile
   $Credential = New-Object PSCredential "Administrator",$password
 
   $LocalPort = 33389
   $PortForwardParams = @{ portNumber=(,"3389"); localPortNumber=(,$LocalPort.ToString()) }
-  $session = Start-SSMSession -Target $InstanceId -Region $Region -DocumentName AWS-StartPortForwardingSession -Parameters $PortForwardParams
+  if($Region) {
+    $session = Start-SSMSession -Target $InstanceId -DocumentName AWS-StartPortForwardingSession -Parameters $PortForwardParams -Region $Region
+  } else {
+    $session = Start-SSMSession -Target $InstanceId -DocumentName AWS-StartPortForwardingSession -Parameters $PortForwardParams
+  }
 
   # We now need to emulate awscli - it invokes session-manager-plugin with the new session information.
   # AWS Tools for PowerShell don't do this. Also some of the objects seem to look a bit different, and the
@@ -235,8 +246,8 @@ function Start-EC2RemoteDesktopViaSessionManager {
 
 function Start-RemoteDesktop {
   [CmdletBinding(SupportsShouldProcess)] param(
-    [Parameter(Mandatory=$true, Position=0)] [String] [string]$HostName,
-    [Parameter(Mandatory=$true, Position=1)] [PSCredential] [string]$Credential,
+    [Parameter(Mandatory=$true, Position=0)] [String] $HostName,
+    [Parameter(Mandatory=$true, Position=1)] [PSCredential] $Credential,
     [Parameter()] [Int32] [string]$Port
   )
 

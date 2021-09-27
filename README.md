@@ -87,9 +87,9 @@ to get a private key.
    same name with a `.pub` extension. Then, using the *Import* button on the EC2 *Key pairs* page to import
    the public key.
 
-By default, the functions in this module will assume that your private key is in the ".ssh\id_rsa" file in
+By default, the functions in this module will assume that your private key is in the `.ssh\id_rsa` file in
 your home directory, which will be the normal situation in method 2 above. If you have used method 1, or have
-your key in any other location, simply pass a "-PrivateKeyFile" parameter to the functions with the path to
+your key in any other location, simply pass a `-PrivateKeyFile` parameter to the functions with the path to
 your private key file.
 
 
@@ -117,7 +117,7 @@ Start-EC2RemoteDesktopViaSessionManager -InstanceId i-12345678abcd `
 ```
 
 If your EC2 instance is reachable on its public IP address, then instead of
-"Start-EC2RemoteDesktopViaSessionManager", you can invoke "Start-DirectEC2RemoteDesktop". This function takes
+`Start-EC2RemoteDesktopViaSessionManager`, you can invoke `Start-DirectEC2RemoteDesktop`. This function takes
 exactly the same parameters but uses the public IP address instead of Session Manager port forwarding.
 
 ```powershell
